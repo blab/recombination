@@ -92,8 +92,7 @@ def pairwise(mapping, segments):
             location = compare(mapping[pair[0]][segment], mapping[pair[1]][segment])
             distance = np.size(location)
             pairwise_dict[pair][segment] = {
-                'snp_loc': location,
-                'distance': distance,
+                'distance': distance
             }
             counter += 1
     return pairwise_dict
