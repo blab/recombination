@@ -112,7 +112,7 @@ def remove_outliers(distance_dict):
     distances_edited = {}
     for key, value in distance_dict.items():
         z = zscore(value)
-        distances_edited[key] = [distance for index, distance in enumerate(distances[key]) if z[index] < 4]
+        distances_edited[key] = [distance for index, distance in enumerate(distance_dict[key]) if z[index] < 4]
     return distances_edited
 
 def hist_genome(distance_dict, output_genome):
@@ -146,12 +146,12 @@ def hist_segments(distance_dict, output_segments):
     fig.text(0.5, 0.04, 'Pairwise genetic distance', ha='center')
     fig.text(0.04, 0.5, 'Frequency', va='center', rotation='vertical')
     ax1 = axs[0,0]
-    ax2 = axs[1,0]
-    ax3 = axs[0,1]
-    ax4 = axs[1,1]
-    ax5 = axs[0,2]
-    ax6 = axs[1,2]
-    ax7 = axs[0,3]
+    ax2 = axs[0,1]
+    ax3 = axs[0,2]
+    ax4 = axs[0,3]
+    ax5 = axs[1,0]
+    ax6 = axs[1,1]
+    ax7 = axs[1,2]
     ax8 = axs[1,3]
 
     ax1.set_title('HA')
