@@ -1,6 +1,11 @@
 '''
 This script produces a heatmap showing genetic distance between each segment for random pairs of samples.
 The heatmap is ordered by full genome genetic distance.
+
+Inputs are:
+    --pairwise, pickle file containing comparison dictionary
+    --max-distance, maximum y of plot.
+    --output, name of output PNG
 '''
 
 import argparse
@@ -16,16 +21,6 @@ def load(pfile):
     '''
     with open(pfile, 'rb') as file:
         pairwise = pickle.load(file)
-    return pairwise
-
-def add_total_distance(pairwise, segments):
-    '''
-    Adds total genetic distance for each pair to the dictionary.
-    '''
-    for pair in pairwise:
-        pairwise[pair]['distance'] = 0
-        for segment in segments:
-            pairwise[pair]['distance'] += pairwise[pair][segment]['distance']
     return pairwise
 
 def choose_random_pairs(pairwise, max_distance):
@@ -83,7 +78,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('--pairwise', type=str, required=True, help='pairwise pickle file')
-    parser.add_argument('--max_distance', type=int, required=True, help='Maximum distance for heatmap')
+    parser.add_argument('--max-distance', type=int, required=True, help='Maximum distance for heatmap')
     parser.add_argument('--output', type=str, required=True, help = 'name of output figure')
     args = parser.parse_args()
 
@@ -93,11 +88,8 @@ if __name__ == '__main__':
     # Loads comparison dictionary from pickle file
     pairwise = load(args.pairwise)
 
-    # Adds total distance to pairwise dictionary
-    pairwise_updated = add_total_distance(pairwise, segments)
-
     # Chooses random pairs for every distance from 0, max_distance
-    random_pairs = choose_random_pairs(pairwise_updated, args.max_distance)
+    random_pairs = choose_random_pairs(pairwise, args.max_distance)
 
     # Creates array to plot.
     array = pairs_to_array(args.max_distance, segments, random_pairs, pairwise)

@@ -3,12 +3,7 @@ This script plots histograms of pairwise divergence for the full influenza genom
 Histograms are colored for within cluster pairs and between cluster pairs for clusters based on specific genetic distance cutoff.
 
 Inputs are:
-    --pairwise, a pickle dictionary of the format: {
-        (strainA, strainB) : {
-        segment : {
-        'distance' : 2,
-        'snp_loc' : 27, 32
-        }}}
+    --pairwise, a pickle dictionary with gentic distance for sample pairs.
     --cutoff, Hamming distance at which to cluster samples
     --output-genome, name of PNG for full genome histogram
     --output-segments, name of PNG for segments histogram
@@ -42,15 +37,13 @@ def adjacency_matrix(strain_list, pairwise, segments, cutoff):
     for indexA, strainA in enumerate(strain_list):
         for indexB, strainB in enumerate(strain_list):
             if indexA != indexB:
-                for segment in segments:
-                    if (strainA, strainB) in pairwise:
-                        adj_matrix[indexA, indexB] += pairwise[(strainA, strainB)][segment]['distance']
-                        adj_matrix[indexB, indexA] += pairwise[(strainA, strainB)][segment]['distance']
-                    elif (strainB, strainA) in pairwise:
-                        adj_matrix[indexA, indexB] += pairwise[(strainB, strainA)][segment]['distance']
-                        adj_matrix[indexB, indexA] += pairwise[(strainB, strainA)][segment]['distance']
-    adj_matrix[adj_matrix < cutoff] = 1
-    adj_matrix[adj_matrix >= cutoff] = 0
+                if (strainA, strainB) in pairwise:
+                    distance = pairwise[(strainA, strainB)]['distance']
+                elif (strainB, strainA) in pairwise:
+                    distance = pairwise[(strainB, strainA)]['distance']
+                if distance < cutoff:
+                    adj_matrix[indexA, indexB] = 1
+                    adj_matrix[indexB, indexA] = 1
     return adj_matrix
 
 def cluster(adj_matrix, strain_list):
@@ -71,38 +64,33 @@ def zscore(data):
     z = np.abs(stats.zscore(data))
     return z
 
-def distances(pairwise, segments, cluster_dict):
+def make_distances_dict(pairwise, segments, cluster_dict):
     '''
     Creates dictionary containing key : list of genetic distances for 10,000 random pairs of samples.
     Keys include 'all', 'between_cluster', 'within_cluster', and within & between for each influenza segment.
     '''
     keys = random.sample(pairwise.keys(), 10000)
     distances = {}
-    all_dist = {}
-    within_cluster = {}
-    between_cluster = {}
+    distances['all'] = []
+    distances['within'] = []
+    distances['between'] = []
     for segment in segments:
         distances[segment + '_within'] = []
         distances[segment + '_between'] = []
-
     for key in keys:
+        distance = pairwise[key]['distance']
+        distances['all'].append(distance)
         (strainA, strainB) = key
-        all_dist[key] = 0
-        for segment in segments:
-            all_dist[key] += pairwise[key][segment]['distance']
         if cluster_dict[strainA] == cluster_dict[strainB]:
-            within_cluster[key] = 0
-            for segment in segments:
-                within_cluster[key] += pairwise[key][segment]['distance']
-                distances[segment + '_within'].append(pairwise[key][segment]['distance'])
+            distances['within'].append(distance)
         else:
-            between_cluster[key] = 0
-            for segment in segments:
-                between_cluster[key] += pairwise[key][segment]['distance']
-                distances[segment + '_between'].append(pairwise[key][segment]['distance'])
-    distances['all'] = list(all_dist.values())
-    distances['within'] = list(within_cluster.values())
-    distances['between'] = list(between_cluster.values())
+            distances['between'].append(distance)
+        for segment in segments:
+            segment_distance = pairwise[key][segment]['distance']
+            if cluster_dict[strainA] == cluster_dict[strainB]:
+                distances[segment + '_within'].append(segment_distance)
+            else:
+                distances[segment + '_between'].append(segment_distance)
     return distances
 
 def remove_outliers(distance_dict):
@@ -123,13 +111,13 @@ def hist_genome(distance_dict, output_genome):
     mpl.rcParams['axes.labelweight']=110
     mpl.rcParams['font.size']=14
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12), facecolor="white", sharex=True, sharey=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12), facecolor='white', sharex=True, sharey=True)
     ax1.set_title('H3N2: Full genome')
     ax1.hist(distance_dict['all'], bins=len(set(distance_dict['all'])))
-    ax1.set_ylabel("Frequency")
+    ax1.set_ylabel('Frequency')
     ax2.hist((distance_dict['within'], distance_dict['between']), label = ('Within clusters', 'Between clusters'), stacked=True, bins=len(set(distance_dict['all'])))
-    ax2.set_xlabel("Pairwise genetic distance")
-    ax2.set_ylabel("Frequency")
+    ax2.set_xlabel('Pairwise genetic distance')
+    ax2.set_ylabel('Frequency')
     ax2.legend()
     return fig.savefig(output_genome, dpi=300)
 
@@ -141,7 +129,7 @@ def hist_segments(distance_dict, output_segments):
     mpl.rcParams['axes.labelweight']=110
     mpl.rcParams['font.size']=14
 
-    fig, axs = plt.subplots(2, 4, figsize=(16, 12), facecolor="white", sharex=True, sharey=True)
+    fig, axs = plt.subplots(2, 4, figsize=(16, 12), facecolor='white', sharex=True, sharey=True)
     fig.suptitle('H3N2', fontsize='large')
     fig.text(0.5, 0.04, 'Pairwise genetic distance', ha='center')
     fig.text(0.04, 0.5, 'Frequency', va='center', rotation='vertical')
@@ -176,21 +164,21 @@ def hist_segments(distance_dict, output_segments):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description="Plot distribution of genetic distance.",
+        description='Plot distribution of genetic distance.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
-    parser.add_argument('--pairwise', type=str, required=True, help="pairwise pickle file")
-    parser.add_argument('--cutoff', type=int, required=True, help="Genomic distance cutoff on which to cluster")
-    parser.add_argument('--output-genome', type=str, required=True, help = "name of output figure")
-    parser.add_argument('--output-segments', type=str, required=True, help = "name of output figure")
+    parser.add_argument('--pairwise', type=str, required=True, help='pairwise pickle file')
+    parser.add_argument('--cutoff', type=int, required=True, help='Genomic distance cutoff on which to cluster')
+    parser.add_argument('--output-genome', type=str, required=True, help = 'name of output figure')
+    parser.add_argument('--output-segments', type=str, required=True, help = 'name of output figure')
     args = parser.parse_args()
 
     # Define influenza segments
     segments = ['ha', 'na', 'pb2', 'pb1', 'pa', 'np', 'mp', 'ns']
 
     # Loads dictionar(y/ies) containing pairwise divegence
-    with open(args.pairwise, "rb") as file:
+    with open(args.pairwise, 'rb') as file:
         pairwise = pickle.load(file)
 
     # Lists strains shared across all segments
@@ -203,10 +191,10 @@ if __name__ == '__main__':
     clusters = cluster(adj_matrix, strains_list)
 
     # Creates list of distances to plot
-    distance_dict = distances(pairwise, segments, clusters)
+    distances = make_distances_dict(pairwise, segments, clusters)
 
     # Removes outliers with a Z-score > 4 from distances dictionary.
-    distances_edited = remove_outliers(distance_dict)
+    distances_edited = remove_outliers(distances)
 
     # Writes histograms of distances
     hist_genome(distances_edited, args.output_genome)

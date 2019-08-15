@@ -85,16 +85,19 @@ def pairwise(mapping, segments):
             print('[', end='')
             for x in range(int(counter / interval)):
                 print('-', end='')
-            for x in range(int(len(strain_pairs)*len(segments) / interval) - int(counter / interval)):
+            for x in range(int(len(strain_pairs) / interval) - int(counter / interval)):
                 print(' ', end='')
             print(']')
+        genome_distance = 0
         for segment in segments:
             location = compare(mapping[pair[0]][segment], mapping[pair[1]][segment])
             distance = np.size(location)
+            genome_distance += distance
             pairwise_dict[pair][segment] = {
                 'distance': distance
             }
-            counter += 1
+        pairwise_dict[pair]['distance'] = genome_distance
+        counter += 1
     return pairwise_dict
 
 if __name__ == '__main__':
