@@ -19,6 +19,14 @@ from scipy import stats
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
+def load(pfile):
+    '''
+    Loads pairwise dictionary from pickle file.
+    '''
+    with open(pfile, 'rb') as file:
+        pairwise = pickle.load(file)
+    return pairwise
+
 def strains(pairwise):
     '''
     Returns set of the strains compared in pairwise dictionary.
@@ -29,7 +37,7 @@ def strains(pairwise):
         strain_list.add(strainB)
     return strain_list
 
-def adjacency_matrix(strain_list, pairwise, segments, cutoff):
+def adjacency_matrix(strain_list, pairwise, cutoff):
     '''
     Returns an adjacency matrix on which to cluster.
     '''
@@ -103,7 +111,7 @@ def remove_outliers(distance_dict):
         distances_edited[key] = [distance for index, distance in enumerate(distance_dict[key]) if z[index] < 4]
     return distances_edited
 
-def hist_genome(distance_dict, output_genome):
+def hist_genome(distance_dict, lineage, output_genome):
     '''
     Plots histogram of genetic distance for entire flu genome
     '''
@@ -112,7 +120,7 @@ def hist_genome(distance_dict, output_genome):
     mpl.rcParams['font.size']=14
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12), facecolor='white', sharex=True, sharey=True)
-    ax1.set_title('H3N2: Full genome')
+    ax1.set_title(lineage+ ': Full genome')
     ax1.hist(distance_dict['all'], bins=len(set(distance_dict['all'])))
     ax1.set_ylabel('Frequency')
     ax2.hist((distance_dict['within'], distance_dict['between']), label = ('Within clusters', 'Between clusters'), stacked=True, bins=len(set(distance_dict['all'])))
@@ -121,7 +129,7 @@ def hist_genome(distance_dict, output_genome):
     ax2.legend()
     return fig.savefig(output_genome, dpi=300)
 
-def hist_segments(distance_dict, output_segments):
+def hist_segments(distance_dict, lineage, output_segments):
     '''
     Plots histogram of genetic distance for each individual flu segment.
     '''
@@ -130,7 +138,7 @@ def hist_segments(distance_dict, output_segments):
     mpl.rcParams['font.size']=14
 
     fig, axs = plt.subplots(2, 4, figsize=(16, 12), facecolor='white', sharex=True, sharey=True)
-    fig.suptitle('H3N2', fontsize='large')
+    fig.suptitle(lineage, fontsize='large')
     fig.text(0.5, 0.04, 'Pairwise genetic distance', ha='center')
     fig.text(0.04, 0.5, 'Frequency', va='center', rotation='vertical')
     ax1 = axs[0,0]
@@ -170,6 +178,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--pairwise', type=str, required=True, help='pairwise pickle file')
     parser.add_argument('--cutoff', type=int, required=True, help='Genomic distance cutoff on which to cluster')
+    parser.add_argument('--lineage', type=str, required=True, help='lineage of virus')
     parser.add_argument('--output-genome', type=str, required=True, help = 'name of output figure')
     parser.add_argument('--output-segments', type=str, required=True, help = 'name of output figure')
     args = parser.parse_args()
@@ -177,15 +186,14 @@ if __name__ == '__main__':
     # Define influenza segments
     segments = ['ha', 'na', 'pb2', 'pb1', 'pa', 'np', 'mp', 'ns']
 
-    # Loads dictionar(y/ies) containing pairwise divegence
-    with open(args.pairwise, 'rb') as file:
-        pairwise = pickle.load(file)
+    # Loads comparison dictionary from pickle file
+    pairwise = load(args.pairwise)
 
     # Lists strains shared across all segments
     strains_list = strains(pairwise)
 
     # Defines adjacency matrix on which to cluster
-    adj_matrix = adjacency_matrix(strains_list, pairwise, segments, args.cutoff)
+    adj_matrix = adjacency_matrix(strains_list, pairwise, args.cutoff)
 
     # Clusters strains based on genetic distance
     clusters = cluster(adj_matrix, strains_list)
@@ -197,5 +205,5 @@ if __name__ == '__main__':
     distances_edited = remove_outliers(distances)
 
     # Writes histograms of distances
-    hist_genome(distances_edited, args.output_genome)
-    hist_segments(distances_edited, args.output_segments)
+    hist_genome(distances_edited, args.lineage, args.output_genome)
+    hist_segments(distances_edited, args.lineage, args.output_segments)

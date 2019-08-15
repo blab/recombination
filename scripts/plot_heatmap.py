@@ -27,18 +27,15 @@ def choose_random_pairs(pairwise, max_distance):
     '''
     Chooses a random pair of samples with a full-genome genetic distance of X for every X in range(0,max_distance)
     '''
-    iterate_list = [*range(max_distance)]
-    pair_list = []
-    for num in iterate_list:
-        distance = []
+    pair_list =[ [] for i in range(max_distance) ]
+    for i, l in enumerate(pair_list):
         for pair in pairwise:
-            if pairwise[pair]['distance'] == num:
-                distance.append(pair)
-        pair_list.append(distance)
-    pairs = []
-    for distance in pair_list:
-        pairs.append(random.choice(distance))
-    return pairs
+            if pairwise[pair]['distance'] == i:
+                l.append(pair)   
+    random_pairs = []
+    for pairs in pair_list:
+        random_pairs.append(random.choice(pairs))
+    return random_pairs
 
 def pairs_to_array(max_distance, segments, pair_list, pairwise):
     '''
@@ -51,7 +48,7 @@ def pairs_to_array(max_distance, segments, pair_list, pairwise):
             array[row, value] = pairwise[pair][segment]['distance']
     return array
 
-def heatmap(array, segments, max_distance, output):
+def heatmap(array, segments, max_distance, lineage, output):
     '''
     Plots array as a heatmap.
     '''
@@ -60,7 +57,7 @@ def heatmap(array, segments, max_distance, output):
     mpl.rcParams['font.size']=14
 
     fig, ax = plt.subplots(figsize=(8, 10), facecolor='white')
-    image = ax.pcolormesh(array)
+    image = ax.pcolormesh(array, vmax=70)
     cbar = fig.colorbar(image, ax=ax)
     cbar.set_label('Genetic distance\nper segment')
 
@@ -68,6 +65,7 @@ def heatmap(array, segments, max_distance, output):
     ax.set_yticklabels(range(0, max_distance, 50))
     ax.set_xticklabels(segments, ha = 'center')
     ax.set_ylabel('Pairwise genetic distance')
+    ax.set_title(lineage)
 
     return plt.savefig(output, dpi=250)
 
@@ -79,6 +77,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--pairwise', type=str, required=True, help='pairwise pickle file')
     parser.add_argument('--max-distance', type=int, required=True, help='Maximum distance for heatmap')
+    parser.add_argument('--lineage', type=str, help = 'name of viral lineage')
     parser.add_argument('--output', type=str, required=True, help = 'name of output figure')
     args = parser.parse_args()
 
@@ -95,4 +94,4 @@ if __name__ == '__main__':
     array = pairs_to_array(args.max_distance, segments, random_pairs, pairwise)
 
     # Plots heatmap of array
-    heatmap(array, segments, args.max_distance, args.output)
+    heatmap(array, segments, args.max_distance, args.lineage, args.output)
