@@ -10,10 +10,9 @@ Its inputs are:
 import argparse
 from Bio import SeqIO
 import numpy as np
-from itertools import combinations
-import pickle
+import h5py
 
-def shared(align_list):
+def find_shared(align_list):
     '''
     Returns list of strains shared across all genome segments.
     '''
@@ -28,8 +27,8 @@ def shared(align_list):
 
 def convert(align_list, segments, shared):
     '''
-    It replaces nucleotide bases with numbers in order to find SNPs efficiently. C,T,G,A are replaced with the first 4 prime numbers.
-    Ambiguous nucleotide bases are replaced with the multiple of those primes for whichever bases the ambiguous bases could represent.
+    Replaces nucleotide bases with numbers in order to find SNPs efficiently. C,T,G,A are replaced with the first 4 prime numbers.
+    Ambiguous nucleotide bases are replaced with the multiple of those primes.
     For example, R, which represents A or G, is 35 because A is 7, and G is 5.
     '''
     mapping = {}
@@ -62,43 +61,51 @@ def convert(align_list, segments, shared):
 
 def compare(array1, array2):
     '''
-    This script identifies SNPs between sequences where sequences are represented as numpy integer arrays.
+    Identifies SNPs between sequences where sequences are represented as numpy integer arrays.
     CTGA must be represented by prime numbers and ambiguous bases are the multiples of those prime numbers.
     '''
     condition1 = (array1 != array2)
     condition2 = (array1 % array2 != 0)
     condition3 = (array2 % array1 != 0)
     location = np.where(condition1 & condition2 & condition3)
-    return location[0]
+    distance = np.size(location)
+    return distance
 
-def pairwise(mapping, segments):
+def compare_pairwise(shared, mapping, segments):
     '''
-    Compares all strains pairwise storing the genetic distance between each strain and the location of pairwise SNPs.
+    Compares all strains pairwise storing the genetic distance between each strains as NxN arrays at the genome & segment level.
     '''
     counter = 0
-    interval = 50000
-    pairwise_dict = {}
-    strain_pairs = list(combinations(mapping.keys(), 2))
-    for pair in strain_pairs:
-        pairwise_dict[pair] = {}
-        if counter % interval == 0:
-            print('[', end='')
-            for x in range(int(counter / interval)):
-                print('-', end='')
-            for x in range(int(len(strain_pairs) / interval) - int(counter / interval)):
-                print(' ', end='')
-            print(']')
-        genome_distance = 0
-        for segment in segments:
-            location = compare(mapping[pair[0]][segment], mapping[pair[1]][segment])
-            distance = np.size(location)
-            genome_distance += distance
-            pairwise_dict[pair][segment] = {
-                'distance': distance
-            }
-        pairwise_dict[pair]['distance'] = genome_distance
-        counter += 1
-    return pairwise_dict
+    interval = 500
+    length = len(shared)
+    pairwise = {}
+    for segment in segments:
+        matrix = np.zeros((length, length), dtype='i4')
+        for indexA, strainA in enumerate(shared):
+            if counter % interval == 0:
+                print("[", end = '')
+                for x in range(int(counter/interval)):
+                    print("-", end = '')
+                for x in range(int((length*len(segments))/interval) - int(counter/interval)):
+                    print(" ", end = '')
+                print("]")
+            for indexB, strainB in enumerate(shared):
+                matrix[indexA, indexB] = compare(mapping[strainA][segment], mapping[strainB][segment])
+            counter +=1
+        pairwise[segment] = np.tril(matrix, -1)
+    pairwise['genome'] = np.zeros((length, length))
+    for segment in segments:
+        pairwise['genome'] = np.add(pairwise['genome'], pairwise[segment])
+    return pairwise
+
+def write_to_h5py(output, shared, pairwise):
+    with h5py.File(output, mode='a') as file:
+        samples = file.create_group('samples')
+        shared_strains = np.asarray(shared, dtype='a50')
+        samples.create_dataset('samples', data=shared_strains)
+        for key in pairwise:
+            subgrp = samples.create_group(key)
+            subgrp.create_dataset(key, data=pairwise[key], compression='gzip')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -114,14 +121,13 @@ if __name__ == '__main__':
     segments = ['ha', 'na', 'pb2', 'pb1', 'pa', 'np', 'mp', 'ns']
 
     # Identifies set of strains shared across all segments.
-    shared_strains = shared(args.alignments)
+    shared_strains = find_shared(args.alignments)
 
     # Converts bases from letters to numbers for comparison
     converted = convert(args.alignments, segments, shared_strains)
 
     # Calculates pairwise divergence for every strain
-    comparison_dict = pairwise(converted, segments)
+    pairwise = compare_pairwise(shared_strains, converted, segments)
 
-    # Save dictionary as pickle file.
-    with open(args.output, 'wb') as file:
-        pickle.dump(comparison_dict, file)
+    # Saves matrices to HDF5 file.
+    write_to_h5py(args.output, shared_strains, pairwise)

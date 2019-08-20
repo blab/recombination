@@ -46,7 +46,7 @@ rule compare:
     input:
         alignments = expand('data/aligned_{{lineage}}_{segment}_{{resolution}}.fasta', segment = segments)
     output:
-        pairwise = 'results/pairwise_{lineage}_genome_{resolution}.pickle'
+        pairwise = 'results/pairwise_{lineage}_genome_{resolution}.hdf5'
     shell:
         '''
         python3 scripts/compare.py \

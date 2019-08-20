@@ -3,41 +3,36 @@ This script produces a heatmap showing genetic distance between each segment for
 The heatmap is ordered by full genome genetic distance.
 
 Inputs are:
-    --pairwise, pickle file containing comparison dictionary
+    --pairwise, HDF5 database produced by compare.py
     --max-distance, maximum y of plot.
+    --clock-rate, list specifying molecular clock rate for each influenza segment
+    --segment-length, list specifying the length of each influenza segment
+    --lineage, lineage of virus, e.g. 'h3n2'
     --output, name of output PNG
 '''
 
 import argparse
-import pickle
+import h5py
 import random
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-def load(pfile):
-    '''
-    Loads pairwise dictionary from pickle file.
-    '''
-    with open(pfile, 'rb') as file:
-        pairwise = pickle.load(file)
-    return pairwise
-
-def choose_random_pairs(pairwise, max_distance):
+def choose_random_pairs(file, max_distance):
     '''
     Chooses a random pair of samples with a full-genome genetic distance of X for every X in range(0,max_distance)
     '''
-    pair_list =[ [] for i in range(max_distance) ]
-    for i, l in enumerate(pair_list):
-        for pair in pairwise:
-            if pairwise[pair]['distance'] == i:
-                l.append(pair)
+    matrix = np.array(file['samples']['genome'].get('genome'))
+    lower_tri = np.tril(np.ones(matrix.shape), -1)
+    pair_list = []
+    for i in range(max_distance):
+        pair_list.append(np.where((lower_tri == 1) & (matrix == i)))
     random_pairs = []
     for pairs in pair_list:
-        random_pairs.append(random.choice(pairs))
+        random_pairs.append(random.choice(list(zip(*pairs))))
     return random_pairs
 
-def pairs_to_array(max_distance, segments, pair_list, pairwise, clock_rate, segment_length):
+def pairs_to_array(max_distance, segments, pair_list, file, clock_rate, segment_length):
     '''
     Creates a matrix where each row represents is a pairwise, and each column is the genetic distance between each segment.
     Rows are ordered from 0 to max_distance.
@@ -45,7 +40,7 @@ def pairs_to_array(max_distance, segments, pair_list, pairwise, clock_rate, segm
     array = np.zeros((max_distance, len(segments)), dtype=int)
     for pair, row in zip(pair_list, range(max_distance)):
         for segment, value in zip(segments, range(len(segments))):
-            array[row, value] = (pairwise[pair][segment]['distance'])
+            array[row, value] = np.array(file['samples'][segment].get(segment))[pair]
     segment_rate = np.asarray([rate * length for rate, length in zip(clock_rate, segment_length)])
     array = (array / segment_rate)
     return array
@@ -60,7 +55,7 @@ def heatmap(array, segments, max_distance, lineage, output):
 
     fig, ax = plt.subplots(figsize=(8, 10), facecolor='white')
     image = ax.pcolormesh(array, vmax=25)
-    cbar = fig.colorbar(image, ax=ax)
+    cbar = fig.colorbar(image, ax=ax, extend='max')
     cbar.set_label('Years since divergence')
 
     ax.set_xticks(np.arange(len(segments))+0.5)
@@ -88,14 +83,17 @@ if __name__ == '__main__':
     # Define influenza segments
     segments = ['ha', 'na', 'pb2', 'pb1', 'pa', 'np', 'mp', 'ns']
 
-    # Loads comparison dictionary from pickle file
-    pairwise = load(args.pairwise)
+    # Opens HDF5 file
+    hfile = h5py.File(args.pairwise, mode='r')
 
     # Chooses random pairs for every distance from 0, max_distance
-    random_pairs = choose_random_pairs(pairwise, args.max_distance)
+    random_pairs = choose_random_pairs(hfile, args.max_distance)
 
     # Creates array to plot.
-    array = pairs_to_array(args.max_distance, segments, random_pairs, pairwise, args.clock_rate, args.segment_length)
+    array = pairs_to_array(args.max_distance, segments, random_pairs, hfile, args.clock_rate, args.segment_length)
 
     # Plots heatmap of array
     heatmap(array, segments, args.max_distance, args.lineage, args.output)
+
+    # Closes HDF5 file
+    hfile.close()
