@@ -1,20 +1,40 @@
-segments = ['ha', 'na', 'pb2', 'pb1', 'pa', 'np', 'mp', 'ns']
-lineages = ['h3n2', 'h1n1pdm']
-resolutions = ['1y', '2y']
 
 rule all:
     input:
-        histogram_genome = expand('results/hist_distance_{lineage}_genome_{resolution}.png', lineage = lineages, resolution = '1y'),
-        histogram_segments = expand('results/hist_distance_{lineage}_segments_{resolution}.png', lineage = lineages, resolution = '1y'),
-        heatmap = expand('results/heatmap_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y')
+        histogram_genome = expand('results/hist_distance_{pathogen}.png', pathogen = 'mers'),
+        heatmap = expand('results/heatmap_{pathogen}.png', pathogen = 'mers')
 
 rule files:
     params:
-        reference = 'config/reference_{lineage}_{segment}.gb'
+        reference = 'config/reference_{pathogen}.gb'
 
 files = rules.files.params
 
-"""
+rule parse:
+    message:
+        """
+        Parsing fasta into sequences and metadata
+        for {wildcards.pathogen}
+        """
+    input:
+        seqmeta = rules.download_background_seqmeta.output.seqmeta
+    output:
+        sequences = "data/background_sequences_{lineage}_{segment}.fasta",
+        metadata = "data/background_metadata_{lineage}_{segment}.tsv"
+    params:
+        fasta_fields = "strain virus isolate_id date region country division location passage authors age sex"
+    shell:
+        """
+        augur parse \
+            --sequences {input.seqmeta} \
+            --output-sequences {output.sequences} \
+            --output-metadata {output.metadata} \
+            --fields {params.fasta_fields}
+        """
+
+rule filter:
+
+
 rule align:
     message:
         '''
@@ -36,7 +56,7 @@ rule align:
             --remove-reference \
             --nthreads 1
         '''
-"""
+
 
 rule compare:
     message:
