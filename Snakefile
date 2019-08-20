@@ -8,36 +8,6 @@ rule all:
         histogram_segments = expand('results/hist_distance_{lineage}_segments_{resolution}.png', lineage = lineages, resolution = '1y'),
         heatmap = expand('results/heatmap_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y')
 
-rule files:
-    params:
-        reference = 'config/reference_{lineage}_{segment}.gb'
-
-files = rules.files.params
-
-"""
-rule align:
-    message:
-        '''
-        Aligning sequences to {input.reference}
-        - filling gaps with N
-        '''
-    input:
-        sequences =
-        reference = files.reference
-    output:
-        alignment = 'results/aligned_{lineage}_{segment}_{resolution}.fasta'
-    shell:
-        '''
-        augur align \
-            --sequences {input.sequences} \
-            --reference-sequence {input.reference} \
-            --output {output.alignment} \
-            --fill-gaps \
-            --remove-reference \
-            --nthreads 1
-        '''
-"""
-
 rule compare:
     message:
         '''
