@@ -72,7 +72,7 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
-    parser.add_argument('--pairwise', type=str, required=True, help='pairwise pickle file')
+    parser.add_argument('--pairwise', type=str, required=True, help='pairwise hdf5 file')
     parser.add_argument('--max-distance', type=int, required=True, help='Maximum distance for heatmap')
     parser.add_argument('--clock-rate', type=float, nargs='+', required=True, help='list of clock rates for lineage')
     parser.add_argument('--segment-length', type=int, nargs='+', required=True, help='list of segment lengths for lineage')
