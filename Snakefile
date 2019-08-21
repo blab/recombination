@@ -6,7 +6,9 @@ rule all:
     input:
         histogram_genome = expand('results/hist_distance_{lineage}_genome_{resolution}.png', lineage = lineages, resolution = '1y'),
         histogram_segments = expand('results/hist_distance_{lineage}_segments_{resolution}.png', lineage = lineages, resolution = '1y'),
-        heatmap = expand('results/heatmap_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y')
+        heatmap = expand('results/heatmap_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
+        hist_tmrca = expand('results/hist_tmrca_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
+        scatter_tmrca = expand('results/scatter_tmrca_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y')
 
 rule compare:
     message:
@@ -90,4 +92,29 @@ rule plot_heatmap:
             --segment-length {params.segment_length} \
             --lineage {wildcards.lineage} \
             --output {output.heatmap}
+        '''
+
+rule residuals:
+    message:
+        '''
+        For {wildcards.lineage}, finding, plotting & saving cumulative residuals
+        for pairwise TMRCA between all flu segments.
+        '''
+    input:
+        pairwise = rules.compare.output.pairwise
+    params:
+        clock_rate = clock_rate,
+        segment_length = segment_length
+    output:
+        scatterplot = 'results/scatter_tmrca_{lineage}_{resolution}.png',
+        histogram = 'results/hist_tmrca_{lineage}_{resolution}.png'
+    shell:
+        '''
+        python3 scripts/find_residuals.py \
+            --pairwise {input.pairwise} \
+            --clock-rate {params.clock_rate} \
+            --segment-length {params.segment_length} \
+            --lineage {wildcards.lineage} \
+            --output-scatter {output.scatterplot} \
+            --output-hist {output.histogram}
         '''
