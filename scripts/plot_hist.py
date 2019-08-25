@@ -13,34 +13,12 @@ Inputs are:
 import argparse
 import h5py
 import numpy as np
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import connected_components
 import random
 from scipy import stats
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
-def adjacency_matrix(file, cutoff):
-    '''
-    Returns an adjacency matrix on which to cluster.
-    '''
-    matrix = np.array(file['samples']['genome'].get('genome'), dtype='i4')
-    lower_tri = np.tril(np.ones(matrix.shape), -1)
-    adj_matrix = np.zeros(matrix.shape)
-    adj_matrix[(matrix < cutoff) & (lower_tri == 1)] = 1
-    return adj_matrix
-
-def cluster(adj_matrix):
-    '''
-    Uses SciPy connected_components to cluster samples.
-    '''
-    graph = csr_matrix(adj_matrix)
-    n_clusters, labels = connected_components(
-        csgraph=graph, directed=False, return_labels=True
-    )
-    return np.asarray(labels)
-
-def make_distances_dict(file, segments, clusters):
+def make_distances_dict(file, segments, cutoff):
     '''
     Creates dictionary containing key : list of genetic distances for 10,000 random pairs of samples.
     Keys include 'all', 'between_cluster', 'within_cluster', and within & between for each influenza segment.
@@ -48,6 +26,7 @@ def make_distances_dict(file, segments, clusters):
     matrix = np.array(file['samples']['genome'].get('genome'))
     indices = np.tril_indices(matrix.shape[0], -1)
     keys = random.sample(list(zip(*indices)), 10000)
+    clusters = np.array(file['samples'].get('clusters' + str(cutoff)))
 
     keys_0 = np.asarray([i for i,j in keys])
     keys_1 = np.asarray([j for i, j in keys])
@@ -69,7 +48,6 @@ def make_distances_dict(file, segments, clusters):
         segment_matrix = np.array(file['samples'][segment].get(segment))
         distances[segment + '_within'] = segment_matrix[within_keys_0, within_keys_1]
         distances[segment + '_between'] = segment_matrix[between_keys_0, between_keys_1]
-
     return distances
 
 def zscore(data):
@@ -97,7 +75,7 @@ def hist_genome(distance_dict, lineage, output_genome):
     mpl.rcParams['axes.labelweight']=110
     mpl.rcParams['font.size']=14
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12), facecolor='white', sharex=True, sharey=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 16), facecolor='white', sharex=True, sharey=True)
     ax1.set_title(lineage+ ': full genome')
     ax1.hist(distance_dict['all'], bins=len(set(distance_dict['all'])))
     ax1.set_ylabel('Frequency')
@@ -107,7 +85,7 @@ def hist_genome(distance_dict, lineage, output_genome):
     ax2.set_ylabel('Frequency')
     ax2.set_xlim(left=0)
     ax2.legend()
-    return fig.savefig(output_genome, dpi=250)
+    return fig.savefig(output_genome, dpi=300)
 
 def hist_segments(distance_dict, lineage, output_segments):
     '''
@@ -117,7 +95,7 @@ def hist_segments(distance_dict, lineage, output_segments):
     mpl.rcParams['axes.labelweight']=110
     mpl.rcParams['font.size']=14
 
-    fig, axs = plt.subplots(2, 4, figsize=(16, 6), facecolor='white', sharex=True, sharey=True)
+    fig, axs = plt.subplots(2, 4, figsize=(12, 16), facecolor='white', sharex=True, sharey=True)
     fig.suptitle(lineage, fontsize='large')
     fig.text(0.5, 0.04, 'Pairwise genetic distance', ha='center')
     fig.text(0.04, 0.5, 'Frequency', va='center', rotation='vertical')
@@ -176,14 +154,8 @@ if __name__ == '__main__':
     # Opens HDF5 file
     hfile = h5py.File(args.pairwise, mode='r')
 
-    # Defines adjacency matrix on which to cluster
-    adj_matrix = adjacency_matrix(hfile, args.cutoff)
-
-    # Clusters strains based on genetic distance
-    clusters = cluster(adj_matrix)
-
     # Creates list of distances to plot
-    distances = make_distances_dict(hfile, segments, clusters)
+    distances = make_distances_dict(hfile, segments, args.cutoff)
 
     # Removes outliers with a Z-score > 4 from distances dictionary.
     distances_edited = remove_outliers(distances)

@@ -4,16 +4,18 @@ resolutions = ['1y', '2y']
 
 rule all:
     input:
-        histogram_genome = expand('results/hist_distance_{lineage}_genome_{resolution}.png', lineage = lineages, resolution = '1y'),
-        histogram_segments = expand('results/hist_distance_{lineage}_segments_{resolution}.png', lineage = lineages, resolution = '1y'),
-        heatmap = expand('results/heatmap_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
-        hist_tmrca = expand('results/hist_tmrca_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
-        scatter_tmrca = expand('results/scatter_tmrca_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y')
+        histogram_genome = expand('results/figs/hist_distance_{lineage}_genome_{resolution}.png', lineage = lineages, resolution = '1y'),
+        histogram_segments = expand('results/figs/hist_distance_{lineage}_segments_{resolution}.png', lineage = lineages, resolution = '1y'),
+        heatmap = expand('results/figs/heatmap_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
+        hist_tmrca = expand('results/figs/hist_tmrca_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
+        scatter_tmrca = expand('results/figs/scatter_tmrca_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
+        pca_pairs = expand('results/figs/pca_pairs_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
+        pca_strains = expand('results/figs/pca_strains_{lineage}_{resolution}.png', lineage = lineages, resolution = '1y'),
 
 rule compare:
     message:
         '''
-        Calculating pairwise genetic distance for all samples for segments and full-genome.
+        For {wildcards.lineage}, calculating pairwise genetic distance for all samples for segments and full-genome.
         '''
     input:
         alignments = expand('data/aligned_{{lineage}}_{segment}_{{resolution}}.fasta', segment = segments)
@@ -26,18 +28,38 @@ rule compare:
             --output {output.pairwise}
         '''
 
-rule plot_histogram:
+rule cluster:
     message:
         '''
-        Plotting histogram of genetic distance for segments & genomes.
+        For {wildcards.lineage}, using SciPy's connected_components to cluster based on a genetic distance < than cutoff.
         '''
     input:
         pairwise = rules.compare.output.pairwise
     params:
+        cutoff = 30  #When changing this number, also change the number in output as well.
+    output:
+        json = 'results/clusters_30_{lineage}_{resolution}.json'
+    shell:
+        '''
+        python3 scripts/cluster.py  \
+            --pairwise {input.pairwise} \
+            --cutoff {params.cutoff} \
+            --output {output.json}
+        '''
+
+rule plot_histogram:
+    message:
+        '''
+        Plotting histogram of genetic distance for segments & genomes for {wildcards.lineage}
+        '''
+    input:
+        pairwise = rules.compare.output.pairwise,
+        clusters = rules.cluster.output.json
+    params:
         cutoff = 30
     output:
-        genome_histogram = 'results/hist_distance_{lineage}_genome_{resolution}.png',
-        segments_histogram = 'results/hist_distance_{lineage}_segments_{resolution}.png'
+        genome_histogram = 'results/figs/hist_distance_{lineage}_genome_{resolution}.png',
+        segments_histogram = 'results/figs/hist_distance_{lineage}_segments_{resolution}.png'
     shell:
         '''
         python3 scripts/plot_hist.py \
@@ -50,7 +72,7 @@ rule plot_histogram:
 
 def clock_rate(w):
     '''
-    For a given lineage, this functions retursn a list containig clock rate for each segment.
+    For a given lineage, this functions returns a list containig clock rate for each segment.
     This list is ordered according to segments.
     '''
     rate = {
@@ -73,7 +95,7 @@ def segment_length(w):
 rule plot_heatmap:
     message:
         '''
-        Plotting heatmap of genetic distance for each segment.
+        Plotting heatmap of genetic distance for each segment for {wildcards.lineage}
         '''
     input:
         pairwise = rules.compare.output.pairwise
@@ -82,7 +104,7 @@ rule plot_heatmap:
         clock_rate = clock_rate,
         segment_length = segment_length
     output:
-        heatmap = 'results/heatmap_{lineage}_{resolution}.png'
+        heatmap = 'results/figs/heatmap_{lineage}_{resolution}.png'
     shell:
         '''
         python3 scripts/plot_heatmap.py \
@@ -106,8 +128,8 @@ rule residuals:
         clock_rate = clock_rate,
         segment_length = segment_length
     output:
-        scatterplot = 'results/scatter_tmrca_{lineage}_{resolution}.png',
-        histogram = 'results/hist_tmrca_{lineage}_{resolution}.png'
+        scatterplot = 'results/figs/scatter_tmrca_{lineage}_{resolution}.png',
+        histogram = 'results/figs/hist_tmrca_{lineage}_{resolution}.png'
     shell:
         '''
         python3 scripts/find_residuals.py \
@@ -117,4 +139,29 @@ rule residuals:
             --lineage {wildcards.lineage} \
             --output-scatter {output.scatterplot} \
             --output-hist {output.histogram}
+        '''
+
+rule pca:
+    message:
+        '''
+        For {wildcards.lineage}, performing PCA on strains & strain pairs.
+        '''
+    input:
+        pairwise = rules.compare.output.pairwise,
+        clusters = rules.cluster.output.json
+    params:
+        cutoff = 30,
+        components = 8
+    output:
+        pca_pairs = 'results/figs/pca_pairs_{lineage}_{resolution}.png',
+        pca_strains = 'results/figs/pca_strains_{lineage}_{resolution}.png'
+    shell:
+        '''
+        python3 scripts/perform_pca.py  \
+            --pairwise {input.pairwise} \
+            --cutoff {params.cutoff} \
+            --components {params.components} \
+            --lineage {wildcards.lineage} \
+            --output-pairs {output.pca_pairs} \
+            --output-strains {output.pca_strains}
         '''

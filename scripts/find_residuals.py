@@ -1,14 +1,7 @@
 '''
-This script finds cumulative residuals for pairwise TMRCA between all influenza
+This script finds the cumulative residuals for pairwise TMRCA between all influenza
 segment combinations. It stores those residuals in a NxN matrix in the HDF5 file
 and produces a histogram of their distribution.
-
-Inputs are:
-    --pairwise, HDF5 file containing pairwise distances created by compare.py
-    --clock-rate, list specifying molecular clock rate for each influenza segment
-    --segment-length, list specifying the length of each influenza segment
-    --lineage, lineage of virus, e.g. 'h3n2'
-    --output, name of output PNG
 '''
 
 import argparse
@@ -119,12 +112,12 @@ def write_to_h5py(file, matrix):
     group = file['samples']['genome']
     if 'residuals' in group:
         del group['residuals']
-    group.create_dataset('residuals', data=matrix, compression='gzip')
+    group.create_dataset('residuals', data=matrix)
     return file.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Heatmap of genetic distance for influenza',
+        description='Find TMRCA residuals',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 

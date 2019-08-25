@@ -4,7 +4,8 @@ Currently, it works for influenza alignments given in the order: 'ha', 'na', 'pb
 
 Its inputs are:
     --alignments, a list of genome segment alignments
-    --output, the location of an output dictionary.
+    --output, the location of an output HDF5 file containing an array of the shared strains
+    and pairwise matrices for the whole genome and each segment.
 '''
 
 import argparse
@@ -23,11 +24,13 @@ def find_shared(align_list):
             strains.add(record.id)
         setlist.append(strains)
     shared = set.intersection(*setlist)
-    return shared
+    shared_list = list(shared)
+    return shared_list
 
 def convert(align_list, segments, shared):
     '''
-    Replaces nucleotide bases with numbers in order to find SNPs efficiently. C,T,G,A are replaced with the first 4 prime numbers.
+    Replaces nucleotide bases with numbers in order to find SNPs efficiently.
+    C,T,G,A are replaced with the first 4 prime numbers.
     Ambiguous nucleotide bases are replaced with the multiple of those primes.
     For example, R, which represents A or G, is 35 because A is 7, and G is 5.
     '''
@@ -99,13 +102,16 @@ def compare_pairwise(shared, mapping, segments):
     return pairwise
 
 def write_to_h5py(output, shared, pairwise):
+    '''
+    Writes pairwise matrices & list of shared strains to HDF5 file.
+    '''
     with h5py.File(output, mode='a') as file:
         samples = file.create_group('samples')
-        shared_strains = np.asarray(shared, dtype='a50')
+        shared_strains = np.asarray(shared, dtype='S50')
         samples.create_dataset('samples', data=shared_strains)
         for key in pairwise:
             subgrp = samples.create_group(key)
-            subgrp.create_dataset(key, data=pairwise[key], compression='gzip')
+            subgrp.create_dataset(key, data=pairwise[key])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

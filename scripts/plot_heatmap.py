@@ -34,7 +34,7 @@ def choose_random_pairs(file, max_distance):
 
 def pairs_to_array(max_distance, segments, pair_list, file, clock_rate, segment_length):
     '''
-    Creates a matrix where each row represents is a pairwise, and each column is the genetic distance between each segment.
+    Creates a matrix where each row represents a pair of strains, and each column is the genetic distance between each segment.
     Rows are ordered from 0 to max_distance.
     '''
     array = np.zeros((max_distance, len(segments)), dtype=int)
@@ -63,8 +63,7 @@ def heatmap(array, segments, max_distance, lineage, output):
     ax.set_xticklabels(segments, ha = 'center')
     ax.set_ylabel('Pairwise genetic distance')
     ax.set_title(lineage)
-
-    return plt.savefig(output, dpi=250)
+    return plt.savefig(output, dpi=300)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
